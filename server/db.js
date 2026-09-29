@@ -12,9 +12,18 @@ if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 
-// Enable WAL mode for high concurrency
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Configure SQLite for networked/container storage
+try {
+  db.pragma('journal_mode = WAL');
+} catch (e) {
+  console.warn('WAL mode unavailable, falling back to DELETE mode:', e.message);
+  try {
+    db.pragma('journal_mode = DELETE');
+  } catch (err) {}
+}
+try {
+  db.pragma('foreign_keys = ON');
+} catch (e) {}
 
 function initSchema() {
   db.exec(`
