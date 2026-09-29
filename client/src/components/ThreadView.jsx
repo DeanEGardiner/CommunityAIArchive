@@ -22,7 +22,9 @@ import {
   Shield,
   ExternalLink,
   Lock,
-  Unlock
+  Unlock,
+  Share2,
+  Link2
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -50,12 +52,37 @@ export default function ThreadView({
   const [editingPostId, setEditingPostId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [copiedPostId, setCopiedPostId] = useState(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const prevPostCountRef = useRef(posts?.length || 0);
   const initialThreadIdRef = useRef(null);
+
+  // Check if current URL targets a specific post via hash (e.g. #/thread/...#post-xyz)
+  useEffect(() => {
+    if (!posts || posts.length === 0) return;
+    const hash = window.location.hash || '';
+    if (hash.includes('#post-')) {
+      const targetPostId = hash.split('#post-')[1]?.split('?')[0];
+      if (targetPostId) {
+        setTimeout(() => {
+          const el = document.getElementById(`post-${targetPostId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'box-shadow 0.3s ease, border-color 0.3s ease';
+            el.style.borderColor = 'var(--accent-primary)';
+            el.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
+            setTimeout(() => {
+              el.style.boxShadow = '';
+              el.style.borderColor = '';
+            }, 2500);
+          }
+        }, 200);
+      }
+    }
+  }, [posts, thread?.id]);
 
   // Scroll to bottom ONLY on initial thread open or when a brand-new post/reply is added
   useEffect(() => {
@@ -451,8 +478,32 @@ export default function ThreadView({
       }
     };
 
+    const handleSharePost = (e) => {
+      e.stopPropagation();
+      const origin = window.location.origin;
+      const shareUrl = `${origin}/#/thread/${thread.id}?board=${board?.id || ''}#post-${post.id}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopiedPostId(post.id);
+        setTimeout(() => {
+          setCopiedPostId(null);
+        }, 2000);
+      }).catch(err => {
+        // Fallback for browsers with restricted clipboard
+        const input = document.createElement('input');
+        input.value = shareUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        setCopiedPostId(post.id);
+        setTimeout(() => {
+          setCopiedPostId(null);
+        }, 2000);
+      });
+    };
+
     return (
-      <div key={post.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div key={post.id} id={`post-${post.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <div
           style={{
             display: 'flex',
@@ -657,6 +708,50 @@ export default function ThreadView({
                     <span>Delete{isAdmin && !isAuthor ? ' (Admin)' : ''}</span>
                   </button>
                 )}
+
+                {/* Share / Copy link button */}
+                <button
+                  type="button"
+                  onClick={handleSharePost}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '3px 8px',
+                    background: copiedPostId === post.id ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                    border: `1px solid ${copiedPostId === post.id ? 'rgba(34, 197, 94, 0.4)' : 'var(--border-subtle)'}`,
+                    borderRadius: '6px',
+                    color: copiedPostId === post.id ? '#4ade80' : 'var(--text-secondary)',
+                    fontSize: '11.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    if (copiedPostId !== post.id) {
+                      e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                      e.currentTarget.style.color = '#fff';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (copiedPostId !== post.id) {
+                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    }
+                  }}
+                  title="Copy direct link to this post"
+                >
+                  {copiedPostId === post.id ? (
+                    <>
+                      <Check size={12} color="#4ade80" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 size={12} />
+                      <span>Share</span>
+                    </>
+                  )}
+                </button>
 
                 {/* Reply to this post button (disabled when thread is locked) */}
                 {!thread?.is_locked && (

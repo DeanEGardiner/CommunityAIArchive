@@ -60,10 +60,11 @@ export default function App() {
           await handleSelectBoard(boardId);
         }
       } else if (hash.startsWith('#/thread/')) {
-        // format: #/thread/<threadId>?board=<boardId>
-        const parts = hash.replace('#/thread/', '').split('?');
-        const threadId = parts[0];
-        const params = new URLSearchParams(parts[1] || '');
+        // format: #/thread/<threadId>?board=<boardId>#post-<postId>
+        const cleanHash = hash.replace('#/thread/', '');
+        const threadId = cleanHash.split('?')[0].split('#')[0];
+        const queryString = cleanHash.includes('?') ? cleanHash.split('?')[1].split('#')[0] : '';
+        const params = new URLSearchParams(queryString);
         const boardId = params.get('board') || null;
         if (threadId) {
           await handleSelectThread(boardId, threadId);
