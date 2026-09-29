@@ -46,7 +46,18 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/settings', (req, res) => {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   const settings = {};
-  for (const r of rows) settings[r.key] = r.value;
+  for (const r of rows) {
+    if (r.key === 'gemini_api_key') {
+      const val = r.value || '';
+      // Mask key: return whether it is configured and a safe preview only
+      settings.gemini_api_key_configured = val.trim().length > 0;
+      settings.gemini_api_key_masked = val.trim().length > 8 
+        ? `${val.slice(0, 4)}••••••••••••••••••••••••${val.slice(-4)}`
+        : (val ? '••••••••' : '');
+    } else {
+      settings[r.key] = r.value;
+    }
+  }
   res.json(settings);
 });
 
@@ -59,7 +70,9 @@ app.post('/api/settings', (req, res) => {
   `);
   db.transaction(() => {
     for (const [k, v] of Object.entries(updates)) {
-      upsert.run(k, String(v));
+      if (v !== undefined && v !== null) {
+        upsert.run(k, String(v).trim());
+      }
     }
   })();
   res.json({ success: true });

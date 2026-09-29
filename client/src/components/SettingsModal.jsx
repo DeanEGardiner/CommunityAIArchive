@@ -4,29 +4,37 @@ import { api } from '../api';
 
 export default function SettingsModal({ isOpen, onClose, onSaved }) {
   const [geminiKey, setGeminiKey] = useState('');
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [maskedKey, setMaskedKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadSettings();
+      setGeminiKey('');
     }
   }, [isOpen]);
 
   const loadSettings = async () => {
     try {
       const s = await api.getSettings();
-      if (s.gemini_api_key) setGeminiKey(s.gemini_api_key);
+      setIsConfigured(Boolean(s.gemini_api_key_configured));
+      setMaskedKey(s.gemini_api_key_masked || '');
     } catch (e) {
       console.error('Failed to load settings:', e);
     }
   };
 
   const handleSave = async () => {
+    if (!geminiKey.trim()) {
+      onClose();
+      return;
+    }
     setIsSaving(true);
     try {
       await api.updateSettings({
-        gemini_api_key: geminiKey
+        gemini_api_key: geminiKey.trim()
       });
       setSavedSuccess(true);
       setTimeout(() => {
@@ -76,13 +84,28 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label" style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '6px', display: 'block' }}>
-              Google Gemini API Key
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="form-label" style={{ fontSize: '13px', fontWeight: 600, color: '#fff', margin: 0 }}>
+                Google Gemini API Key
+              </label>
+              {isConfigured && (
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#4ade80',
+                  background: 'rgba(34, 197, 94, 0.12)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  padding: '1px 8px',
+                  borderRadius: '12px'
+                }}>
+                  Active: {maskedKey}
+                </span>
+              )}
+            </div>
             <input 
               type="password"
               className="form-input"
-              placeholder="AIzaSy..."
+              placeholder={isConfigured ? "Enter new key to replace existing..." : "AIzaSy..."}
               value={geminiKey}
               onChange={(e) => setGeminiKey(e.target.value)}
               style={{
@@ -96,7 +119,9 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
               }}
             />
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-              Used for community thread analysis, Google Search grounding, and automated AI spam detection.
+              {isConfigured 
+                ? "Key is securely stored in database and never exposed in plaintext. Leave blank to keep current key."
+                : "Used for community thread analysis, Google Search grounding, and automated AI spam detection."}
             </span>
           </div>
         </div>
