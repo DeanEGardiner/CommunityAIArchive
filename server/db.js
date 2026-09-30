@@ -12,18 +12,18 @@ if (!fs.existsSync(MEDIA_DIR)) fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 const db = new Database(DB_PATH);
 
-// Configure SQLite for networked/container storage
+// Configure SQLite for networked volume storage (GCS FUSE):
+// 1. DELETE mode ensures all commits write directly into the single .db file
+//    rather than relying on POSIX shared-memory locks (.db-shm / .db-wal)
+// 2. synchronous = FULL ensures the OS flushes every transaction before returning
 try {
-  db.pragma('journal_mode = WAL');
-} catch (e) {
-  console.warn('WAL mode unavailable, falling back to DELETE mode:', e.message);
-  try {
-    db.pragma('journal_mode = DELETE');
-  } catch (err) {}
-}
-try {
+  db.pragma('journal_mode = DELETE');
+  db.pragma('synchronous = FULL');
   db.pragma('foreign_keys = ON');
-} catch (e) {}
+  db.pragma('busy_timeout = 5000');
+} catch (e) {
+  console.warn('[DB] SQLite pragma warning:', e.message);
+}
 
 function initSchema() {
   db.exec(`
